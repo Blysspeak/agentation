@@ -10,6 +10,8 @@ import type { Dispatch, SetStateAction } from "react";
 import { usePagePath, runPageTask, matchesPage } from "../../utils/page-routing";
 import { createPortal } from "react-dom";
 import { useFeedbackPortal } from "./use-feedback-portal";
+import { useHoldToAnnotate, resolveHoldKey } from "./use-hold-to-annotate";
+import type { HoldToAnnotate } from "./use-hold-to-annotate";
 import { ShadowRoot } from "../shadow-root";
 
 import {
@@ -354,6 +356,12 @@ export type PageFeedbackToolbarCSSProps = {
   appName?: string;
   /** Enable global keyboard shortcuts. Popup Enter/Escape remain available. Defaults to true. */
   enableKeyboardShortcuts?: boolean;
+  /**
+   * Annotate only while a key is held. `true` uses the Backquote key (the key left of "1");
+   * `{ key }` takes a KeyboardEvent.code such as "F9" or a single character. Off by default.
+   * Independent of `enableKeyboardShortcuts`.
+   */
+  holdToAnnotate?: HoldToAnnotate;
   /** Stable data attributes used in element paths. Replaces the default identifying list. */
   identifyingAttributes?: readonly string[];
   /** Format the Copy action. Send to Agent always receives structured markdown. */
@@ -392,6 +400,7 @@ function PageFeedbackToolbarForRoute({
   useHashLocation = false,
   appName,
   enableKeyboardShortcuts = true,
+  holdToAnnotate,
   identifyingAttributes = DEFAULT_IDENTIFYING_ATTRIBUTES,
   copyFormat = "markdown",
   onOpenSource,
@@ -1615,6 +1624,16 @@ function PageFeedbackToolbarForRoute({
     setIsActive(false);
   }, [isDesignMode]);
 
+  useHoldToAnnotate({
+    pageEvents,
+    holdKey: resolveHoldKey(holdToAnnotate),
+    enabled: mounted && !isToolbarHidden,
+    isActive,
+    popupOpen: !!pendingAnnotation || !!editingAnnotation,
+    activate: () => setIsActive(true),
+    deactivate,
+  });
+
   // Freeze animations (delegates to freeze-animations utility)
   const freezeAnimations = useCallback(() => {
     if (isFrozen) return;
@@ -1762,6 +1781,10 @@ function PageFeedbackToolbarForRoute({
       setShowSettings(false); // Close settings when toolbar closes
       setPendingMultiSelectElements([]); // Clear multi-select
       legacyMultiSelectRef.current = false; // Reset modifier tracking
+      // Ending the mode mid-drag (a released hold key) must not leave a drag pending.
+      mouseDownPosRef.current = null;
+      dragStartRef.current = null;
+      setIsDragging(false);
       if (isFrozen) {
         unfreezeAnimations();
       }

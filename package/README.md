@@ -53,6 +53,7 @@ browser: create a test annotation and ask your agent to read
 - **Click to annotate** – Click any element with automatic selector identification
 - **Text selection** – Select text to annotate specific content
 - **Multi-select** – Hold Cmd/Ctrl to build a selection by clicking elements individually, or drag to select multiple at once
+- **Hold to annotate** – Opt in to annotating only while a key is held, so the page stays clickable the rest of the time
 - **Area selection** – Drag to annotate any region, even empty space
 - **Animation pause** – Pause supported CSS animations, Web Animations, and videos to capture specific states
 - **Structured output** – Copy markdown with selectors, positions, and context
@@ -79,10 +80,55 @@ browser: create a test annotation and ask your agent to read
 | `useHashLocation` | `boolean` | `false` | Separate feedback, layout state and sessions by pathname plus hash |
 | `appName` | `string` | - | Identify the app in copied and submitted feedback |
 | `enableKeyboardShortcuts` | `boolean` | `true` | Enable global shortcuts; popup Enter/Escape and button activation remain available |
+| `holdToAnnotate` | `boolean \| { key?: string }` | `false` | Annotate only while a key is held (default `Backquote`), then return to normal browsing. See [Hold to annotate](#hold-to-annotate) |
 | `identifyingAttributes` | `readonly string[]` | See below | Attributes captured from the selected element for identification |
 | `copyFormat` | `"markdown"`, `"source"`, `"classes"`, or attribute option | `"markdown"` | Choose the Copy output; Send still receives structured markdown and annotations |
 | `onOpenSource` | `(sourceFile: string) => void` | - | Show Open in editor when source metadata is available |
 | `portalContainer` | `HTMLElement \| ShadowRoot \| null` | `document.body` | Place Agentation inside a host modal or popover's focus boundary |
+
+### Hold to annotate
+
+While feedback mode is on, every click creates a note. To keep browsing without
+toggling the toolbar, opt in to a hold key:
+
+```tsx
+<Agentation holdToAnnotate />                     // hold ` (the key left of 1)
+<Agentation holdToAnnotate={{ key: "F9" }} />     // any KeyboardEvent.code, or one character such as "g"
+```
+
+While the key is down the toolbar is in feedback mode and looks exactly as it
+does when opened by hand. When you release it, the page behaves normally again.
+
+- The mode ends on key release, window blur and when the tab is hidden, so it
+  cannot stick if a keyup is lost. Key repeat is ignored.
+- The key is ignored while typing in an input, textarea, select or contenteditable
+  element, while a popup is open, while the toolbar is hidden, and when pressed
+  with Ctrl, Cmd, Alt or Shift.
+- A popup opened during the hold stays open and usable after release or blur, so an
+  unsent comment is never discarded. The mode then ends when the popup is
+  submitted or cancelled. Markers are visible only while the mode is on.
+- If the mode was already on (toolbar button or Ctrl/Cmd+Shift+F), the hold key
+  does nothing and releasing it never turns the mode off. Escape also ends a hold.
+- It works without `enableKeyboardShortcuts`, which controls the toolbar's own
+  shortcuts only.
+
+**Why Backquote.** Browsers attach default actions to modifier keys and
+function keys, not to ordinary keys. Chrome lists Ctrl/Cmd+click (new tab),
+Shift+click (new window) and Alt/Option+click (download a link); Shift+click also
+extends a text selection; Alt alone focuses the menu bar in Firefox on Windows and
+Linux; F-keys and Meta are often taken by the browser or the OS. Backquote is
+none of these. Chrome's shortcut list has no Backquote binding, and no shortcut in
+Firefox's `browser-sets.inc` or `browser.ftl` uses it, so neither a bare press nor
+a press plus a click has a browser default. Space (scrolls, presses buttons),
+Tab and Enter (focus and activation) and letters (Firefox find-as-you-type; the
+toolbar's own P, L, H, C, X and S shortcuts) were rejected.
+
+The default is matched by `KeyboardEvent.code`, the physical key, so it is the
+same key on Cyrillic and other layouts (where it types characters such as `ё`).
+On Japanese keyboards it is the hankaku/zenkaku (IME) key, so pick another
+`key` there. Custom keys are matched the same way: a code such as `"F9"`
+or `"KeyG"`, or a single character, which is compared with `KeyboardEvent.key`
+ignoring case.
 
 ### App identity, selectors and copying
 
