@@ -78,14 +78,42 @@ export function getElementPath(target: HTMLElement, maxDepth = 4, attributeNames
 
     // Get identifier
     let identifier = tag;
-    if (current.id) {
+    const isGeneratedId = current.id && /^(:[rR][a-zA-Z0-9]*:|_r_[0-9]+_)$/.test(current.id);
+    
+    if (current.id && !isGeneratedId) {
       identifier = `#${current.id}`;
-    } else if (current.className && typeof current.className === "string") {
-      const meaningfulClass = current.className
-        .split(/\s+/)
-        .find(c => c.length > 2 && !c.match(/^[a-z]{1,2}$/) && !c.match(/[A-Z0-9]{5,}/));
-      if (meaningfulClass) {
-        identifier = `.${meaningfulClass.split("_")[0]}`;
+    } else {
+      let foundClass = false;
+      if (current.className && typeof current.className === "string") {
+        const classes = current.className.split(/\s+/);
+        for (const c of classes) {
+          if (c.length <= 2 || /^[a-z]{1,2}$/.test(c)) continue;
+          
+          let m = c.match(/^_([a-zA-Z0-9-]+)_[a-zA-Z0-9]{4,}_\d+$/); // Vite
+          if (m) { identifier = `.${m[1]}`; foundClass = true; break; }
+          m = c.match(/(?:^|__)([a-zA-Z0-9-]+)___?[a-zA-Z0-9-]+$/); // Webpack 1
+          if (m) { identifier = `.${m[1]}`; foundClass = true; break; }
+          m = c.match(/^[a-zA-Z0-9-]+_([a-zA-Z0-9-]+)__[a-zA-Z0-9-]+$/); // Webpack 2
+          if (m) { identifier = `.${m[1]}`; foundClass = true; break; }
+          
+          if (!c.match(/[A-Z0-9]{5,}/)) {
+            identifier = `.${c.split("_")[0] || c}`;
+            foundClass = true;
+            break;
+          }
+        }
+      }
+      
+      if (!foundClass) {
+        const role = current.getAttribute("role");
+        const ariaLabel = current.getAttribute("aria-label");
+        if (role) {
+          identifier += `[role="${role}"]`;
+        } else if (ariaLabel && ariaLabel.length <= 40) {
+          identifier += `[aria-label="${ariaLabel.replace(/"/g, '\\"')}"]`;
+        } else if (ariaLabel) {
+          identifier += `[aria-label]`;
+        }
       }
     }
 
